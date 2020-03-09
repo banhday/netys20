@@ -21,17 +21,16 @@ CONSTANTS N,              \* The number of processes
           T,              \* The maximum number of failures
           F,              \* The current number of failures  
           Delta,          \* Bound for message delay
-          Phi             \* Bound for relaive process speed
-                          
-Proc == 1..N                        \* Set of processes  
-MsgAge == 0..Delta                  \* Possible ages of in-transit messages 
-TOGuard == 3 * Phi + Delta + 2      \* The upper bound of timeout[p, q]
-TODefault == 1                      \* Default value for timeout[p, q]
-TOSet == 0..TOGuard                 \* Possible values of timeout[p, q]
-Break_Period == 0..(Phi - 1)        \* A process can be frozen in (Phi-1) steps.
-\* For type information of msg buffers  
-MsgAgePowerSet == [Proc \times Proc -> SUBSET (0..Delta)]
-FromLastSendSet == 0..(3 * Phi - 1) \* For an inductive invariant
+          Phi,            \* Bound for relaive process speed
+          Proc,           \* Proc == 1..N                        \* Set of processes  
+          MsgAge,         \* MsgAge == 0..Delta                  \* Possible ages of in-transit messages 
+          TOGuard,        \* TOGuard == 3 * Phi + Delta + 2      \* The upper bound of timeout[p, q]
+          TODefault,      \* TODefault == 1                      \* Default value for timeout[p, q]
+          TOSet,          \* TOSet == 0..TOGuard                 \* Possible values of timeout[p, q]
+          Break_Period,   \* Break_Period == 0..(Phi - 1)        \* A process can be frozen in (Phi-1) steps.
+                          \* For type information of msg buffers  
+          MsgAgePowerSet, \* MsgAgePowerSet == [Proc \times Proc -> SUBSET (0..Delta)]
+          FromLastSendSet \* FromLastSendSet == 0..(3 * Phi - 1) \* For an inductive invariant
 
 \* For the model checker APALACHE
 a <: b == a
@@ -158,17 +157,17 @@ Schedule ==
                           IF p \notin aliveProc
                           THEN "crash"
                           ELSE IF p \notin activeProc 
-                          THEN pc[p]
-                          ELSE IF pc[p] = "send" 
-                          THEN  "del"
-                          ELSE IF pc[p] = "del"
-                          THEN "comp"
-                          ELSE "send"]    
+                               THEN pc[p]
+                               ELSE IF pc[p] = "send" 
+                                    THEN  "del"
+                                    ELSE IF pc[p] = "del"
+                                         THEN "comp"
+                                         ELSE "send"]    
           /\ break_timer' = [ p \in Proc |-> IF p \notin aliveProc   
                                              THEN 0 
                                              ELSE IF p \in activeProc
-                                             THEN 0
-                                             ELSE break_timer[p] + 1]
+                                                  THEN 0
+                                                  ELSE break_timer[p] + 1]
                                           
        
 \* Increase every age by 1. This udpate is done in the "sched" subround.                                                                                    
@@ -182,8 +181,8 @@ AgeIncrease ==
   /\ fromLastSend' = [p \in Proc |-> IF pc'[p] = "send" /\ break_timer'[p] = 0                                          
                                      THEN 0 
                                      ELSE IF pc'[p] = "crash" 
-                                     THEN 0
-                                     ELSE fromLastSend[p] + 1]                            
+                                          THEN 0
+                                          ELSE fromLastSend[p] + 1]                            
    
 \* Update the configuration because of recently crashed processes.     
 UponCrash ==
@@ -212,8 +211,8 @@ AddNewMsgs ==
                     THEN {} <: {Int}       
                     ELSE IF /\ pc[snder] = "send" 
                             /\ break_timer[snder] = 0                             
-                    THEN { 0 } \cup msgBuf[snder, rcver] 
-                    ELSE msgBuf[snder, rcver] ]
+                         THEN { 0 } \cup msgBuf[snder, rcver] 
+                         ELSE msgBuf[snder, rcver] ]
   /\ UNCHANGED << pc, break_timer, del, fromLastSend >>
      
 \* Only increase waiting time  
@@ -224,8 +223,8 @@ UponSend ==
                             ELSE IF /\ pc[p] = "send" 
                                     /\ break_timer[p] = 0 
                                     /\ waiting_time[p, q] < time_out[p, q]
-                            THEN waiting_time[p, q] + 1
-                            ELSE waiting_time[p, q]]
+                                 THEN waiting_time[p, q] + 1
+                                 ELSE waiting_time[p, q]]
   /\ UNCHANGED << suspected, time_out >>                           
    
 \*  - For every pair of processes <<snder, rcver>>, remove an arbitrary set of 
@@ -242,15 +241,15 @@ Deliver ==
           IF pc[rcver] = "crash"
           THEN msgBuf'[snder, rcver] = {} <: {Int}
           ELSE IF pc[rcver] = "del" /\ break_timer[rcver] = 0
-          THEN /\ msgBuf'[snder, rcver] \subseteq msgBuf[snder, rcver]
-               /\ \A k \in msgBuf'[snder, rcver] : k < Delta 
-          ELSE msgBuf'[snder, rcver] = msgBuf[snder, rcver]      
+               THEN /\ msgBuf'[snder, rcver] \subseteq msgBuf[snder, rcver]
+                    /\ \A k \in msgBuf'[snder, rcver] : k < Delta 
+               ELSE msgBuf'[snder, rcver] = msgBuf[snder, rcver]      
   /\ del' = [<< rcver, snder >> \in Proc \times Proc |->
                     IF pc[rcver] = "crash"                                                             
                     THEN FALSE                    
                     ELSE IF pc[rcver] = "del" /\ break_timer[rcver] = 0 
-                    THEN msgBuf'[snder, rcver] # msgBuf[snder, rcver]                           
-                    ELSE del[rcver, snder] ] 
+                         THEN msgBuf'[snder, rcver] # msgBuf[snder, rcver]                           
+                         ELSE del[rcver, snder] ] 
   /\ UNCHANGED << pc, break_timer, fromLastSend >>
                       
 \*  - If an active rcver has not received any messages from a snder in this step,  
@@ -265,19 +264,18 @@ UponReceive ==
                             IF pc[p] = "crash" 
                             THEN 0
                             ELSE IF pc[p] = "del"/\ break_timer[p] = 0  
-                            THEN IF del'[p, q] 
-                                 THEN 0
-                                 ELSE IF waiting_time[p, q] < time_out[p, q] 
-                                 THEN waiting_time[p, q] + 1           
-                                 ELSE waiting_time[p, q]
-                            ELSE waiting_time[p, q]]      
+                                 THEN IF del'[p, q] 
+                                      THEN 0
+                                      ELSE IF waiting_time[p, q] < time_out[p, q] 
+                                           THEN waiting_time[p, q] + 1           
+                                           ELSE waiting_time[p, q]
+                                 ELSE waiting_time[p, q]]      
   /\ suspected' = [<< p, q >> \in Proc \times Proc |-> 
-                            CASE pc[p] = "crash" ->  
-                                    FALSE
-                              [] pc[p] = "del" /\ break_timer[p] = 0 /\ del'[p, q] /\ suspected[p, q] -> 
-                                    FALSE
-                              [] OTHER -> 
-                                    suspected[p, q] ]                                  
+                            IF (pc[p] = "crash")   
+                            THEN FALSE
+                            ELSE IF pc[p] = "del" /\ break_timer[p] = 0 /\ del'[p, q] /\ suspected[p, q]  
+                                 THEN FALSE
+                                 ELSE suspected[p, q] ]                                  
   /\ time_out' = [<< p, q >> \in Proc \times Proc |-> 
                             IF pc[p] = "crash"   
                             THEN 0
@@ -285,24 +283,23 @@ UponReceive ==
                                     /\ break_timer[p] = 0
                                     /\ suspected[p, q]                                    
                                     /\ ~suspected'[p, q]  
-                            THEN time_out[p, q] + 1
-                            ELSE time_out[p, q]]   
+                                 THEN time_out[p, q] + 1
+                                 ELSE time_out[p, q]]   
     
       
 \*  - If the waiting time equals the time-out, change the predicition.
 \*  - Update the waiting time.    
 Comp ==
   /\ suspected' = [<< p, q >> \in Proc \times Proc |-> 
-                      CASE pc[p] = "crash" ->  
-                                FALSE
-                        [] /\ pc[p] = "comp" 
-                           /\ p # q
-                           /\ break_timer[p] = 0 
-                           /\ ~del[p, q] 
-                           /\ waiting_time[p, q] = time_out[p, q] -> 
-                                TRUE
-                        [] OTHER -> 
-                                suspected[p, q] ]
+                      IF pc[p] = "crash"   
+                      THEN FALSE
+                      ELSE IF /\ pc[p] = "comp" 
+                              /\ p # q
+                              /\ break_timer[p] = 0 
+                              /\ ~del[p, q] 
+                              /\ waiting_time[p, q] = time_out[p, q]  
+                           THEN TRUE
+                           ELSE suspected[p, q] ]
   /\ waiting_time' = [<< p, q >> \in Proc \times Proc |-> 
                             IF pc[p] = "crash"    
                             THEN 0
@@ -310,8 +307,8 @@ Comp ==
                                     /\ break_timer[p] = 0 
                                     /\ waiting_time[p, q] < time_out[p, q]
                                     /\ ~suspected'[p, q]
-                            THEN waiting_time[p, q] + 1
-                            ELSE waiting_time[p, q]]
+                                 THEN waiting_time[p, q] + 1
+                                 ELSE waiting_time[p, q]]
   /\ UNCHANGED << time_out >>                               
   
   
@@ -361,6 +358,17 @@ Next ==
 
 \* Check only StrongCompleteness and EventualStrongAccuracy with Spec  
 Spec == Init /\ [][Next]_vars /\ WF_vars(Next)
+
+WrongTypeOK ==
+  /\ pc \in [Proc -> Action]
+  /\ Cardinality({p \in Proc : pc[p] = "crash"}) <= F
+  /\ del \in [Proc \times Proc -> BOOLEAN]  
+  /\ msgBuf \in [Proc \times Proc -> SUBSET Int]
+  /\ subround \in {"sched", "comp"}
+  /\ break_timer \in [Proc -> Int] 
+  /\ waiting_time \in [ Proc \times Proc -> Int]
+  /\ suspected \in [Proc \times Proc -> BOOLEAN]  
+  /\ time_out \in [ Proc \times Proc -> Int]
                
 \* Type information - very simple ones
 TypeOK ==
@@ -412,7 +420,7 @@ StrongCompleteness ==
 
 \* There is a time after which correct processes are not suspected by any correct 
 \* process. 
-EventualStrongAccuracy == 
+EventuallyStrongAccuracy == 
   <>[](\A p, q \in Proc : (pc[p] # "crash" /\ pc[q] # "crash") => ~suspected[p, q])
   
 \* The following is a list of constraints in my inductive invariant. This inductive
@@ -459,8 +467,8 @@ WaitingTimeVal ==
             IF pc[p] = "crash"
             THEN waiting_time[p, q] = 0
             ELSE IF pc[q] = "crash"
-            THEN waiting_time[p, q] = time_out[p, q] 
-            ELSE waiting_time[p, q] < time_out[p, q]   
+                 THEN waiting_time[p, q] = time_out[p, q] 
+                 ELSE waiting_time[p, q] < time_out[p, q]   
                                          
 
 \* The postfix requires that every message which was sent by a crashed process was
@@ -570,7 +578,7 @@ ImmediatelyAfterDelivery ==
            
 \* In this postfix, a correct process never receives a message from a crashed one.
 \* Moreover, del[p, p] is always FALSE.           
-DelVal ==              
+DelVal ==               
   /\ del \in [Proc \times Proc -> BOOLEAN]                                
   /\ \A snder, rcver \in Proc :                                         
         ((pc[snder] = "crash" \/ pc[rcver] = "crash")
@@ -602,7 +610,7 @@ IndInvInPostfix ==
 PostfixInit ==
   /\ subround = "sched"
   /\ PostfixConstraints  
-  
+   
 \* The specification of the postfix  
 PostfixSpec == PostfixInit /\ [][Next]_vars /\ WF_vars(Next)
 
@@ -613,27 +621,28 @@ PostfixIndInv ==
 
 \* The following describes an inductive invariant in this algorithm which
 \* allow that the number of crashes increases after one transition.  
-Crash_IndInv ==  
+Crash_IndInv ==   
   /\ pc \in [Proc -> Action]
-  /\ Cardinality({p \in Proc : pc[p] = "crash"}) <= F
+  /\ Cardinality({p \in Proc : pc[p] = "crash"}) = F
+  \* Only for the synchronous model
+  /\ \A p, q \in Proc : (pc[p] # "crash" /\ pc[q] # "crash") => pc[p] = pc[q]
+  
 
 \* Following constraints on time_out are used in IndInv.  
 Timeout_IndInv ==  
-  /\ time_out \in [ Proc \times Proc -> TOSet]
-  /\ \A p \in Proc : 
-        /\ time_out[p, p] = 0
+  /\ time_out \in [ Proc \times Proc -> TOSet]  
+  /\ \A p \in Proc :         
         /\ pc[p] = "crash" => (\A q \in Proc : time_out[p, q] = 0)
-        /\ pc[p] # "crash" => (\A q \in Proc \ {p} : time_out[p, q] > 0)
+        /\ pc[p] # "crash" => (\A q \in Proc : time_out[p, q] > 0)
         
 \* Following constraints on waiting_time are used in IndInv.       
 WaitingTime_IndInv ==         
   /\ waiting_time \in [ Proc \times Proc -> TOSet]
   /\ \A rcver \in Proc : 
-        /\ waiting_time[rcver, rcver] = 0
         /\ pc[rcver] = "crash" 
               => (\A snder \in Proc : waiting_time[rcver, snder] = 0)
         /\ pc[rcver] # "crash" 
-              => \A snder \in Proc \ {rcver} : 
+              => \A snder \in Proc  : 
                     /\ waiting_time[rcver, snder] <= time_out[rcver, snder]
                     /\ (  /\ time_out[rcver, snder] = TOGuard
                           /\ waiting_time[rcver, snder] = time_out[rcver, snder] )
@@ -681,9 +690,9 @@ Suspect_IndInv ==
   /\ suspected \in [Proc \times Proc -> BOOLEAN]
   /\ \A p \in Proc : 
           /\ ~suspected[p, p]
-          /\ pc[p] = "crash" => \A q \in Proc \ {p} : ~suspected[p, q]
+          /\ pc[p] = "crash" => \A q \in Proc : ~suspected[p, q]
           /\ pc[p] # "crash" 
-                => (\A q \in Proc \ {p} : 
+                => (\A q \in Proc : 
                       suspected[p, q] => waiting_time[p, q] = time_out[p, q])
 
 \* Following constraints on waitingtime and crashed processes are used in IndInv.
@@ -700,38 +709,141 @@ WaitingTimeCrashPC ==
 
 \* Inductive invariant
 IndInv ==
-  \/ subround \in {"send", "del", "comp"}
-  \/ /\ Crash_IndInv
-     /\ Timeout_IndInv  
-     /\ WaitingTime_IndInv     
+  \/ /\ subround \in {"send", "del", "comp"}
+     \* /\ Print(100, TRUE)
+  \/ \* /\ Print(0, TRUE)
+     /\ Crash_IndInv
+     \* /\ Print(1, TRUE) 
+     /\ Timeout_IndInv
+     \* /\ Print(2, TRUE)  
+     /\ WaitingTime_IndInv
+     \* /\ Print(3, TRUE)     
      /\ BreakTimer_IndInv
+     \* /\ Print(4, TRUE)
      /\ FromLastSend_IndInv
-     /\ MsgBuf_IndInv      
-     /\ ImmediatelyAfterDelivery     
-     /\ Del_IndInv     
-     /\ Suspect_IndInv     
-     /\ Subround_IndInv     
-     /\ WaitingTimeCrashPC     
+     \* /\ Print(5, TRUE)
+     /\ MsgBuf_IndInv
+     \* /\ Print(6, TRUE)      
+     /\ ImmediatelyAfterDelivery
+     \* /\ Print(8, TRUE)     
+     /\ Del_IndInv
+     \* /\ Print(9, TRUE)     
+     /\ Suspect_IndInv
+     \* /\ Print(10, TRUE)     
+     /\ Subround_IndInv
+     \* /\ Print(11, TRUE)     
+     /\ WaitingTimeCrashPC
+     \* /\ Print(12, TRUE)     
      
 \* Whilte we can write Init_IndInv == subround = "sched" /\ IndInv, APALACHE
 \* complains about no assignment strategy.      
 Init_IndInv ==
   /\ subround = "sched"
+  \* /\ Print(1, TRUE)
   /\ Crash_IndInv
-  /\ Timeout_IndInv  
+  \* /\ Print(2, TRUE)
+  /\ Timeout_IndInv
+  \* /\ Print(3, TRUE)  
   /\ WaitingTime_IndInv
+  \* /\ Print(4, TRUE)
   /\ BreakTimer_IndInv
+  \* /\ Print(5, TRUE)
   /\ FromLastSend_IndInv
-  /\ MsgBuf_IndInv      
+  \* /\ Print(6, TRUE)
+  /\ MsgBuf_IndInv
+  \* /\ Print(7, TRUE)      
   /\ ImmediatelyAfterDelivery
+  \* /\ Print(8, TRUE)
   /\ Del_IndInv
+  \* /\ Print(9, TRUE)
   /\ Suspect_IndInv
-  /\ Subround_IndInv    
+  \* /\ Print(10, TRUE)
+  /\ Subround_IndInv 
+  \* /\ Print(11, TRUE)   
   /\ WaitingTimeCrashPC
+  \* /\ Print(vars, TRUE)
+  
      
 Spec_IndInv == Init_IndInv /\ [][Next]_vars /\ WF_vars(Next)
 
+ConstInit1 == 
+  /\ N \in {1} 
+  /\ T \in {1} 
+  /\ F \in {1} 
+  /\ Phi \in {1} 
+  /\ Delta \in {0}
+  /\ Proc \in {1..1}
+  /\ MsgAge \in  {0..0} 
+  /\ TOGuard \in {5}
+  /\ TODefault \in {1}
+  /\ TOSet \in {0..5}
+  /\ Break_Period \in {0..0}
+  /\ MsgAgePowerSet \in {[(1..1) \times (1..1) -> SUBSET (0..0)]}
+  /\ FromLastSendSet \in {0..2}
+  
+ConstInit2 == 
+  /\ N \in {2} 
+  /\ T \in {2} 
+  /\ F \in {2} 
+  /\ Phi \in {1} 
+  /\ Delta \in {0}  
+  /\ Proc \in {1..2}
+  /\ MsgAge \in  {0..0} 
+  /\ TOGuard \in {5}
+  /\ TODefault \in {1}
+  /\ TOSet \in {0..5}
+  /\ Break_Period \in {0..0}
+  /\ MsgAgePowerSet \in {[(1..2) \times (1..2) -> SUBSET (0..0)]}
+  /\ FromLastSendSet \in {0..2} 
 
+
+
+Init0 ==
+  /\ break_timer =  1 :> 0 @@ 2 :> 0
+  /\ del =
+         <<1, 1>> :> FALSE
+      @@ <<1, 2>> :> TRUE
+      @@ <<2, 1>> :> FALSE
+      @@ <<2, 2>> :> FALSE
+  /\ fromLastSend = 1 :> 1 @@ 2 :> 1
+  /\ msgBuf =
+    <<1, 1>> :> {} @@ <<1, 2>> :> {} @@ <<2, 1>> :> {} @@ <<2, 2>> :> {}
+  /\ pc = 1 :> "del" @@ 2 :> "del"
+  /\ subround = "sched"
+  /\ suspected =
+         <<1, 1>> :> FALSE
+      @@ <<1, 2>> :> FALSE
+      @@ <<2, 1>> :> TRUE
+      @@ <<2, 2>> :> FALSE
+  /\ time_out = <<1, 1>> :> 3 @@ <<1, 2>> :> 2 @@ <<2, 1>> :> 1 @@ <<2, 2>> :> 1
+  /\ waiting_time =
+    <<1, 1>> :> 1 @@ <<1, 2>> :> 0 @@ <<2, 1>> :> 1 @@ <<2, 2>> :> 1          
+        
+Spec0 == Init0 /\ [][Next]_vars /\ WF_vars(Next)
+
+Init1 ==
+  /\ break_timer = 1 :> 0 @@ 2 :> 0
+  /\ del =
+    <<1, 1>> :> FALSE
+      @@ <<1, 2>> :> TRUE
+      @@ <<2, 1>> :> FALSE
+      @@ <<2, 2>> :> FALSE
+  /\ fromLastSend = 1 :> 2 @@ 2 :> 0
+  /\ msgBuf =
+    <<1, 1>> :> {} @@ <<1, 2>> :> {} @@ <<2, 1>> :> {} @@ <<2, 2>> :> {}
+  /\ pc = 1 :> "comp" @@ 2 :> "crash"
+  /\ subround = "sched"
+  /\ suspected =
+   <<1, 1>> :> FALSE
+      @@ <<1, 2>> :> FALSE
+      @@ <<2, 1>> :> TRUE
+      @@ <<2, 2>> :> FALSE
+  /\ time_out = <<1, 1>> :> 3 @@ <<1, 2>> :> 2 @@ <<2, 1>> :> 0 @@ <<2, 2>> :> 0
+  /\ waiting_time =
+    <<1, 1>> :> 2 @@ <<1, 2>> :> 1 @@ <<2, 1>> :> 0 @@ <<2, 2>> :> 0
+        
+Spec1 == Init1 /\ [][Next]_vars /\ WF_vars(Next)
+        
 
 \* Test case configurations's for APALACHE 
 (*
@@ -903,5 +1015,5 @@ ConstInit_N2T1F1P3D3 ==
   
 =============================================================================
 \* Modification History
-\* Last modified Sun Mar 08 22:31:28 CET 2020 by tthai
+\* Last modified Mon Mar 09 19:38:29 CET 2020 by tthai
 \* Created Fri Nov 29 14:06:49 CET 2019 by tthai
